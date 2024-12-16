@@ -1,0 +1,59 @@
+## Files
+fortran.y
+fortran.l
+attributes.h
+
+## Rules
+When implementing the rules given in the project I made added a couple of 
+additional necessary rules:
+    1) VarDecl:
+        This rule is needed to make the VarList rule possible as it allows
+        for the list to have Var or AssignStmt as its elements.
+    2) DeclBlock and StmtBlock:
+        These rules were necessary to implement the Prog rule and allowing
+        for 0 or more repetitions of Decl and Stmt respectively. 
+    3) Start:
+        This is just a start rule allowing me to build the AST and print it.
+
+## AST
+This program builds uses Flex and Bison to build an Abstract Syntax Tree for
+the input program file. The AST is composed of nodes (ASTNode) and decorated
+with some attributes. Each node has a type, and an array of children (which
+can be empty). An important decision I made when building the AST is to cull
+unnecessary nodes. What I mean by that is if all a node does is contain 1
+child node and add no semantic information then I just pass its child node
+up. For example, the rule SFactor -> Factor, this rule just contains the 
+Factor node and adds no semantic information, so I don't create the SFactor
+node and instead set its value to the Factor node. This decision really 
+helped to clean up the output of the AST.
+
+## Attributes
+The AST is decorated with a couple simple attributes: 
+    1) sval:
+        This is a synthesized attribute which represents the string value of
+        a node.
+    2) ival:
+        This is a synthesized attribute which represents the integer value 
+        of a node.
+    3) rval:
+        This is a synthesized attribute which represents the real (float) 
+        value of a node.
+    4) actual_type:
+        This is an inherited attribute which represents the actual data type
+        of a node.
+    5) expected_type:
+        This is an inherited attribute which represents the expected data 
+        type of a node.
+
+## Output
+The output of the program is to print this AST in the following format:
+   ↳Node 
+      ↳Child (attribute=value)
+      ↳Child2 
+         ↳Child2_1 (attribute2=value) 
+      ↳Child3
+      ...
+In this format each node is printed with a "↳" followed by its name and in 
+the parentheses are its attributes which are in the format name=value. Each
+of the node's child nodes are printed below and indented in to indicate the
+relationship.
