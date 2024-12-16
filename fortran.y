@@ -3,7 +3,6 @@
 #include <string.h> 
 
 typedef struct ASTNode {
-//    NodeType type;
     char* sval;
     struct ASTNode** children;
     int childCount;
@@ -17,10 +16,7 @@ ASTNode* create_node1(char*, ASTNode*);
 ASTNode* create_node2(char*, ASTNode*, ASTNode*);
 ASTNode* create_node3(char*, ASTNode*, ASTNode*, ASTNode*);
 
-void print_ast_node(ASTNode*, int);
-
-ASTNode* NODE_LPAREN = NULL;
-ASTNode* NODE_RPAREN = NULL; 
+// Reused nodes
 ASTNode* NODE_PLUS = NULL; 
 ASTNode* NODE_MINUS = NULL; 
 ASTNode* NODE_POW = NULL;
@@ -30,27 +26,16 @@ ASTNode* NODE_CAT = NULL;
 ASTNode* NODE_EQ = NULL;
 ASTNode* NODE_LTHAN = NULL;
 ASTNode* NODE_GTHAN = NULL;
-ASTNode* NODE_COMMA = NULL;
-ASTNode* NODE_ASSOP = NULL;
-ASTNode* NODE_DCOLON = NULL;
-ASTNode* NODE_IF = NULL;
-ASTNode* NODE_THEN = NULL;
-ASTNode* NODE_END = NULL;
-ASTNode* NODE_ELSE = NULL;
-ASTNode* NODE_PRINT = NULL;
 ASTNode* NODE_CHARACTER = NULL;
 ASTNode* NODE_INTEGER = NULL;
 ASTNode* NODE_REAL = NULL;
-ASTNode* NODE_LEN = NULL;
-ASTNode* NODE_PROGRAM = NULL;
-
 %}
 
 /* Bison declarations */
 // Semantic value
 %union {
-//    int ival;
-//    float fval;
+    int ival;
+    float fval;
     char* sval;
     struct ASTNode* astnode;
 }
@@ -78,57 +63,42 @@ ASTNode* NODE_PROGRAM = NULL;
 %%
 
 /* Rules */
-// The start rule, only here to allow for printing of the AST
-Start: Prog { printf("Successfully parsed.\n    "); /*print_ast_node($1, 1);*/ }
+Start: Prog { $$ = $1; printf("Successfully parsed.\n"); }
 ;
 
 Prog: PROGRAM IDENT DeclBlock StmtBlock END PROGRAM IDENT { 
-            ASTNode* node = create_nodec("Prog", 7);
-            node->children[0] = NODE_PROGRAM;
-            node->children[1] = create_node1("IDENT", create_nodec($2, 0));
-            node->children[2] = $3;
-            node->children[3] = $4;
-            node->children[4] = NODE_END;
-            node->children[5] = NODE_PROGRAM;
-            node->children[6] = create_node1("IDENT", create_nodec($7, 0));
+            ASTNode* node = create_nodec("Prog", 4);
+            node->children[0] = create_node1("IDENT", create_nodec($2, 0));
+            node->children[1] = $3;
+            node->children[2] = $4;
+            node->children[3] = create_node1("IDENT", create_nodec($7, 0));
             $$ = node;
       }
-//    | PROGRAM IDENT StmtBlock END PROGRAM IDENT { printf("Prog\n"); }
-//    | PROGRAM IDENT DeclBlock END PROGRAM IDENT { printf("Prog\n"); }
-//    | PROGRAM IDENT END PROGRAM IDENT { printf("Prog\n"); }
+    | PROGRAM IDENT StmtBlock END PROGRAM IDENT { $$ = create_node3("Prog", create_node1("IDENT", create_nodec($2, 0)), $3, create_node1("IDENT", create_nodec($6, 0))); }
+    | PROGRAM IDENT DeclBlock END PROGRAM IDENT { $$ = create_node3("Prog", create_node1("IDENT", create_nodec($2, 0)), $3, create_node1("IDENT", create_nodec($6, 0))); }
+    | PROGRAM IDENT END PROGRAM IDENT { $$ = create_node2("Prog", create_node1("IDENT", create_nodec($2, 0)), create_node1("IDENT", create_nodec($5, 0))); }
 ;
 
 // Aditional rule necessary to allow for blocks of 1 or more Decls
 DeclBlock: DeclBlock Decl { $$ = create_node2("DeclBlock", $1, $2); }
          | Decl { $$ = create_node1("DeclBlock", $1); }
-//         | { printf("DeclBlock: empty\n"); }
 ;
 
 // Aditional rule necessary to allow for blocks of 1 or more Stmts
 StmtBlock: StmtBlock Stmt { $$ = create_node2("StmtBlock", $1, $2); }
          | Stmt { $$ = create_node1("StmtBlock", $1); }
-//         | { printf("StmtBlock: empty\n"); }
 ;
 
-Decl: Type DCOLON VarList { $$ = create_node3("Decl", $1, NODE_DCOLON, $3); }
+Decl: Type DCOLON VarList { $$ = create_node2("Decl", $1, $3); }
 ;
 
 Type: INTEGER { $$ = create_node1("Type", NODE_INTEGER); }
     | REAL { $$ = create_node1("Type", NODE_REAL); }
-    | CHARACTER LPAREN LEN ASSOP ICONST RPAREN { 
-        ASTNode* node = create_nodec("Type", 6);
-        node->children[0] = NODE_CHARACTER;
-        node->children[1] = NODE_LPAREN;
-        node->children[2] = NODE_LEN;
-        node->children[3] = NODE_ASSOP;
-        node->children[4] = create_node1("ICONST", create_nodec($5, 0));
-        node->children[5] = NODE_RPAREN;
-        $$ = node;
-    }
+    | CHARACTER LPAREN LEN ASSOP ICONST RPAREN { $$ = create_node2("Type", NODE_CHARACTER, create_node1("ICONST", create_nodec($5, 0))); }
     | CHARACTER { $$ = create_node1("Type", NODE_CHARACTER); }
 ;
 
-VarList: VarList COMMA VarDecl { $$ = create_node3("VarList", $1, NODE_COMMA, $3); }
+VarList: VarList COMMA VarDecl { $$ = create_node2("VarList", $1, $3); }
        | VarDecl { $$ = create_node1("VarList", $1); }
 ;
 
@@ -143,63 +113,24 @@ Stmt: AssignStmt { $$ = create_node1("Stmt", $1); }
     | SimpleIfStmt { $$ = create_node1("Stmt", $1); }
 ;
 
-PrintStmt: PRINT MULT COMMA ExprList { 
-                ASTNode* node = create_nodec("PrintStmt", 4);
-                node->children[0] = NODE_PRINT;
-                node->children[1] = NODE_MULT;
-                node->children[2] = NODE_COMMA;
-                node->children[3] = $4;
-                $$ = node;
-           }
+PrintStmt: PRINT MULT COMMA ExprList { $$ = create_node1("PrintStmt", $4); }
 ;
 
-BlockIfStmt: IF LPAREN RelExpr RPAREN THEN StmtBlock END IF { 
-                ASTNode* node = create_nodec("BlockIfStmt", 8);
-                node->children[0] = NODE_IF;
-                node->children[1] = NODE_LPAREN;
-                node->children[2] = $3;
-                node->children[3] = NODE_RPAREN;
-                node->children[4] = NODE_THEN;
-                node->children[5] = $6;
-                node->children[6] = NODE_END;
-                node->children[7] = NODE_IF;
-                $$ = node;
-           }
-           | IF LPAREN RelExpr RPAREN THEN StmtBlock ELSE StmtBlock END IF { 
-                ASTNode* node = create_nodec("BlockIfStmt", 10);
-                node->children[0] = NODE_IF;
-                node->children[1] = NODE_LPAREN;
-                node->children[2] = $3;
-                node->children[3] = NODE_RPAREN;
-                node->children[4] = NODE_THEN;
-                node->children[5] = $6;
-                node->children[6] = NODE_ELSE;
-                node->children[7] = $8;
-                node->children[8] = NODE_END;
-                node->children[9] = NODE_IF;
-                $$ = node;
-           }
+BlockIfStmt: IF LPAREN RelExpr RPAREN THEN StmtBlock END IF { $$ = create_node2("BlockIfStmt", $3, $6); }
+           | IF LPAREN RelExpr RPAREN THEN StmtBlock ELSE StmtBlock END IF { $$ = create_node3("BlockIfStmt", $3, $6, $8); }
 ;
 
-SimpleIfStmt: IF LPAREN RelExpr RPAREN SimpleStmt { 
-                ASTNode* node = create_nodec("SimpleIfStmt", 5);
-                node->children[0] = NODE_IF;
-                node->children[1] = NODE_LPAREN;
-                node->children[2] = $3;
-                node->children[3] = NODE_RPAREN;
-                node->children[4] = $5;
-                $$ = node;
-            }
+SimpleIfStmt: IF LPAREN RelExpr RPAREN SimpleStmt { $$ = create_node2("SimpleIfStmt", $3, $5); }
 ;
 
 SimpleStmt: AssignStmt { $$ = create_node1("SimpleStmt", $1); }
           | PrintStmt { $$ = create_node1("SimpleStmt", $1); }
 ;
 
-AssignStmt: Var ASSOP Expr { $$ = create_node3("AssignStmt", $1, NODE_ASSOP, $3); }
+AssignStmt: Var ASSOP Expr { $$ = create_node2("AssignStmt", $1, $3); }
 ;
 
-ExprList: ExprList COMMA Expr { $$ = create_node3("ExprList", $1, NODE_COMMA, $3); }
+ExprList: ExprList COMMA Expr { $$ = create_node2("ExprList", $1, $3); }
         | Expr { $$ = create_node1("ExprList", $1); }
 ;
 
@@ -233,7 +164,7 @@ Factor: IDENT { $$ = create_node1("Factor", create_node1("IDENT", create_nodec($
       | ICONST { $$ = create_node1("Factor", create_node1("ICONST", create_nodec($1, 0))); } 
       | RCONST { $$ = create_node1("Factor", create_node1("RCONST", create_nodec($1, 0))); } 
       | SCONST { $$ = create_node1("Factor", create_node1("SCONST", create_nodec($1, 0))); } 
-      | LPAREN Expr RPAREN { $$ = create_node3("Factor", NODE_LPAREN, $2, NODE_RPAREN); }
+      | LPAREN Expr RPAREN { $$ = create_node1("Factor", $2); }
 ;
 
 Var: IDENT { $$ = create_node1("Var", create_node1("IDENT", create_nodec($1, 0))); } 
@@ -271,17 +202,7 @@ ASTNode* create_nodec(char* sval, int childCount) {
     return node;
 }
 
-void print_ast_node(ASTNode* node, int indentation) {
-    printf("%*c", indentation * 2, ' '); // indent
-    printf("↳%s\n", node->sval);
-    for (int i = 0; i < node->childCount; i++) {
-        print_ast_node(node->children[i], indentation + 1);
-    }
-}
-
-int main() {
-    NODE_LPAREN = create_nodec("LPAREN(()", 0);
-    NODE_RPAREN = create_nodec("RPAREN())", 0);
+int main() {  
     NODE_PLUS = create_nodec("PLUS(+)", 0);
     NODE_MINUS = create_nodec("MINUS(-)", 0);
     NODE_POW = create_nodec("POW(**)", 0);
@@ -291,22 +212,11 @@ int main() {
     NODE_EQ = create_nodec("EQ(==)", 0);
     NODE_LTHAN = create_nodec("LTHAN(<)", 0);
     NODE_GTHAN = create_nodec("GTHAN(>)", 0);
-    NODE_COMMA = create_nodec("COMMA(,)", 0);
-    NODE_ASSOP = create_nodec("ASSOP(=)", 0);
-    NODE_DCOLON = create_nodec("DCOLON(::)", 0);
-    NODE_IF = create_nodec("IF", 0);
-    NODE_THEN = create_nodec("THEN", 0);
-    NODE_END = create_nodec("END", 0);
-    NODE_ELSE = create_nodec("ELSE", 0);
-    NODE_PRINT = create_nodec("PRINT", 0);
     NODE_CHARACTER = create_nodec("CHARACTER", 0);
     NODE_INTEGER = create_nodec("INTEGER", 0);
     NODE_REAL = create_nodec("REAL", 0);
-    NODE_LEN = create_nodec("LEN", 0);
-    NODE_PROGRAM = create_nodec("PROGRAM", 0);
-    
+     
 	yyparse();
-	
 	return 0;
 }
 
