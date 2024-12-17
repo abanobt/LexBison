@@ -6,19 +6,6 @@
 int yylex(void);
 void yyerror(char*);
 
-// Reused nodes
-ASTNode* NODE_PLUS = NULL; 
-ASTNode* NODE_MINUS = NULL; 
-ASTNode* NODE_POW = NULL;
-ASTNode* NODE_MULT = NULL;
-ASTNode* NODE_DIV = NULL;
-ASTNode* NODE_CAT = NULL;
-ASTNode* NODE_EQ = NULL;
-ASTNode* NODE_LTHAN = NULL;
-ASTNode* NODE_GTHAN = NULL;
-ASTNode* NODE_CHARACTER = NULL;
-ASTNode* NODE_INTEGER = NULL;
-ASTNode* NODE_REAL = NULL;
 %}
 
 /* Bison declarations */
@@ -32,17 +19,17 @@ ASTNode* NODE_REAL = NULL;
 
 // Tokens
 %token PROGRAM END ELSE IF THEN INTEGER REAL CHARACTER PRINT LEN // Reserverd words
-%token <sval> IDENT SCONST // Identifiers/ String Constants
-%token <ival> ICONST // Integer constant
-%token <rval> RCONST // Real constant 
-%token COMMA LPAREN RPAREN DCOLON DOT DEF // Delimiters
+%token COMMA LPAREN RPAREN DCOLON DOT DEF                        // Delimiters
+%token <sval> IDENT SCONST                                       // Identifiers/String Constants
+%token <ival> ICONST                                             // Integer constants
+%token <rval> RCONST                                             // Real constants
 
-// Associativity
-%right ASSOP // Assignment operator
+// Operator associativity
+%right ASSOP         // Assignment operator
 %left EQ LTHAN GTHAN // Equality, less than, greater than
 %left PLUS MINUS CAT // ddition, subtraction, concatenation
-%left MULT DIV // Multiplication, division
-%left POW // Exponentiation
+%left MULT DIV       // Multiplication, division
+%left POW            // Exponentiation
 
 // Non-terminals
 %type <astnode> Var Factor SFactor TermExpr MultExpr Expr RelExpr ExprList AssignStmt SimpleStmt SimpleIfStmt BlockIfStmt PrintStmt Stmt VarDecl VarList Type Decl StmtBlock DeclBlock Prog Start
@@ -58,40 +45,15 @@ Start: Prog { $$ = $1; printf("Successfully parsed:\n"); print_ast_node($1, 1); 
 
 Prog: PROGRAM IDENT DeclBlock StmtBlock END PROGRAM IDENT { 
             ASTNode* node = create_node(NODE_PROG, 4);
-            
-            ASTNode* ident = create_node(NODE_IDENT, 0);
-            ident->sval = $2;
-            node->children[0] = ident;
-            
+            node->children[0] = create_ident_node($2);
             node->children[1] = $3;
             node->children[2] = $4;
-            
-            ident = create_node(NODE_IDENT, 0);
-            ident->sval = $7;
-            node->children[3] = ident;
+            node->children[3] = create_ident_node($7);
             $$ = node;
       }
-    | PROGRAM IDENT StmtBlock END PROGRAM IDENT { 
-            ASTNode* ident1 = create_node(NODE_IDENT, 0);
-            ident1->sval = $2;
-            ASTNode* ident2 = create_node(NODE_IDENT, 0);
-            ident2->sval = $6;
-            $$ = create_node3(NODE_PROG, ident1, $3, ident2); 
-      }
-    | PROGRAM IDENT DeclBlock END PROGRAM IDENT { 
-            ASTNode* ident1 = create_node(NODE_IDENT, 0);
-            ident1->sval = $2;
-            ASTNode* ident2 = create_node(NODE_IDENT, 0);
-            ident2->sval = $6;
-            $$ = create_node3(NODE_PROG, ident1, $3, ident2); 
-      }
-    | PROGRAM IDENT END PROGRAM IDENT { 
-            ASTNode* ident1 = create_node(NODE_IDENT, 0);
-            ident1->sval = $2;
-            ASTNode* ident2 = create_node(NODE_IDENT, 0);
-            ident2->sval = $5;
-            $$ = create_node2(NODE_PROG, ident1, ident2); 
-      }
+    | PROGRAM IDENT StmtBlock END PROGRAM IDENT { $$ = create_node3(NODE_PROG, create_ident_node($2), $3, create_ident_node($6)); }
+    | PROGRAM IDENT DeclBlock END PROGRAM IDENT { $$ = create_node3(NODE_PROG, create_ident_node($2), $3, create_ident_node($6)); }
+    | PROGRAM IDENT END PROGRAM IDENT { $$ = create_node2(NODE_PROG, create_ident_node($2), create_ident_node($5));}
 ;
 
 // Aditional rule necessary to allow for blocks of 1 or more Decls
@@ -104,18 +66,18 @@ StmtBlock: StmtBlock Stmt { $$ = expand_node($1, $2); }
          | Stmt { $$ = create_node1(NODE_STMT_BLOCK, $1); }
 ;
 
-Decl: Type DCOLON VarList { $$ = create_node2(NODE_DECL, $1, $3); }
+Decl: Type DCOLON VarList { $$ = create_node2(NODE_DECL, $1, $3); $3->data_type = $1->data_type; }
 ;
 
-Type: INTEGER { $$ = create_node(NODE_TYPE, 0); $$->actual_type = TYPE_INTEGER; }
-    | REAL { $$ = create_node(NODE_TYPE, 0); $$->actual_type = TYPE_REAL; }
+Type: INTEGER { $$ = create_node(NODE_TYPE, 0); $$->data_type = TYPE_INTEGER; }
+    | REAL { $$ = create_node(NODE_TYPE, 0); $$->data_type = TYPE_REAL; }
     | CHARACTER LPAREN LEN ASSOP ICONST RPAREN { 
         ASTNode* len_node = create_node(NODE_LEN, 0);
         len_node->ival = $5;
         $$ = create_node1(NODE_TYPE, len_node); 
-        $$->actual_type = TYPE_CHARACTER; 
+        $$->data_type = TYPE_CHARACTER; 
       }
-    | CHARACTER { $$ = create_node(NODE_TYPE, 0); $$->actual_type = TYPE_CHARACTER; }
+    | CHARACTER { $$ = create_node(NODE_TYPE, 0); $$->data_type = TYPE_CHARACTER; }
 ;
 
 VarList: VarList COMMA VarDecl { $$ = expand_node($1, $3); }
@@ -180,11 +142,7 @@ SFactor: PLUS Factor { $$ = create_node1(NODE_SFACTOR, $2); $$->op = OP_PLUS; }
        | Factor { $$ = $1; }
 ;
 
-Factor: IDENT { 
-            ASTNode* ident = create_node(NODE_IDENT, 0);
-            ident->sval = $1;
-            $$ = create_node1(NODE_FACTOR, ident); 
-        } 
+Factor: IDENT { $$ = create_node1(NODE_FACTOR, create_ident_node($1)); } 
       | ICONST { 
             ASTNode* iconst = create_node(NODE_ICONST, 0);
             iconst->ival = $1;
@@ -203,29 +161,12 @@ Factor: IDENT {
       | LPAREN Expr RPAREN { $$ = create_node1(NODE_FACTOR, $2); }
 ;
 
-Var: IDENT { 
-            ASTNode* ident = create_node(NODE_IDENT, 0);
-            ident->sval = $1;
-            $$ = create_node1(NODE_VAR, ident);
-     }
+Var: IDENT { $$ = create_node1(NODE_VAR, create_ident_node($1)); }
 ;
 
 %%
 
-int main() {  
-//    NODE_PLUS = create_node("PLUS(+)", 0);
-//    NODE_MINUS = create_node("MINUS(-)", 0);
-//    NODE_POW = create_node("POW(**)", 0);
-//    NODE_MULT = create_node("MULT(*)", 0);
-//    NODE_DIV = create_node("DIV(/)", 0);
-//    NODE_CAT = create_node("CAT(//)", 0);
-//    NODE_EQ = create_node("EQ(==)", 0);
-//    NODE_LTHAN = create_node("LTHAN(<)", 0);
-//    NODE_GTHAN = create_node("GTHAN(>)", 0);
-//    NODE_CHARACTER = create_node("CHARACTER", 0);
-//    NODE_INTEGER = create_node("INTEGER", 0);
-//    NODE_REAL = create_node("REAL", 0);
-     
+int main() {       
 	yyparse();
 	return 0;
 }

@@ -16,13 +16,13 @@ additional necessary rules:
         This is just a start rule allowing me to build the AST and print it.
 
 ## AST
-This program builds uses Flex and Bison to build an Abstract Syntax Tree for
+This program uses Flex and Bison to build an Abstract Syntax Tree for
 the input program file. The AST is composed of nodes (ASTNode) and decorated
 with some attributes. Each node has a type, and an array of children (which
 can be empty). An important decision I made when building the AST is to cull
 unnecessary nodes. What I mean by that is if all a node does is contain 1
-child node and add no semantic information then I just pass its child node
-up. For example, the rule SFactor -> Factor, this rule just contains the 
+child node and add no semantic information, then I just pass its child node
+up. For example, consider the rule SFactor -> Factor, SFactor just contains the 
 Factor node and adds no semantic information, so I don't create the SFactor
 node and instead set its value to the Factor node. This decision really 
 helped to clean up the output of the AST.
@@ -30,20 +30,20 @@ helped to clean up the output of the AST.
 ## Attributes
 The AST is decorated with a couple simple attributes: 
     1) sval:
-        This is a synthesized attribute which represents the string value of
-        a node.
+        This is an attribute which represents the string value of a node.
     2) ival:
-        This is a synthesized attribute which represents the integer value 
-        of a node.
+        This is an attribute which represents the integer value of a node.
     3) rval:
-        This is a synthesized attribute which represents the real (float) 
-        value of a node.
-    4) actual_type:
-        This is an inherited attribute which represents the actual data type
-        of a node.
-    5) expected_type:
-        This is an inherited attribute which represents the expected data 
-        type of a node.
+        This is an attribute which represents the real (float) value of a node.
+    4) op:
+        This an attribute which represents the operation of a node.
+    4) data_type:
+        This is an inherited attribute which represents the data type of a 
+        node. Usually this is implemented as two attributes: actual_type and
+        expected_type. These attributes would enable type checking. This does
+        require a symbol table and synthesizing the actual type while inheriting
+        the expected_type. I implemented a simpler version, but one that 
+        demonstrates how such a system would be used.
 
 ## Output
 The output of the program is to print this AST in the following format:
